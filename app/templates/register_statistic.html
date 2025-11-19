@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Register Statistic - Introduction Leader{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Register Statistic</h1>
+    
+    <form method="POST" action="{{ url_for('main.register_statistic') }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.date.label }}
+            {{ form.date(class="form-control") }}
+            {% if form.date.errors %}
+                {% for error in form.date.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.location.label }}
+            {{ form.location(class="form-control") }}
+            {% if form.location.errors %}
+                {% for error in form.location.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.participants.label }}
+            {{ form.participants(class="form-control", size=5) }}
+            <small>Hold Ctrl/Cmd to select multiple participants</small>
+            {% if form.participants.errors %}
+                {% for error in form.participants.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.room_captain_id.label }}
+            {{ form.room_captain_id(class="form-control") }}
+            {% if form.room_captain_id.errors %}
+                {% for error in form.room_captain_id.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.guests_count.label }}
+            {{ form.guests_count(class="form-control") }}
+            {% if form.guests_count.errors %}
+                {% for error in form.guests_count.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.registrations_count.label }}
+            {{ form.registrations_count(class="form-control") }}
+            {% if form.registrations_count.errors %}
+                {% for error in form.registrations_count.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.notes.label }}
+            {{ form.notes(class="form-control") }}
+            {% if form.notes.errors %}
+                {% for error in form.notes.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-success">Submit</button>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

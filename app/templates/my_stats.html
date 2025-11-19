@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}My Stats - Introduction Leader{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>My Stats</h1>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Guests</div>
+            <div class="stat-value">{{ stats.totals.total_guests }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Registrations</div>
+            <div class="stat-value">{{ stats.totals.total_registrations }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Effectiveness</div>
+            <div class="stat-value">{{ "%.2f"|format(stats.totals.effectiveness_pct) }}%</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Sessions Led</div>
+            <div class="stat-value">{{ stats.totals.sessions_led_count }}</div>
+        </div>
+    </div>
+    
+    <h2>Recent Sessions</h2>
+    {% if stats.recent_sessions %}
+        <ul class="session-list">
+            {% for session in stats.recent_sessions %}
+                <li class="session-item">
+                    <strong>{{ session.date }}</strong> - {{ session.location }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No sessions found.</p>
+    {% endif %}
+    
+    <a href="{{ url_for('main.dashboard') }}" class="btn">Back to Dashboard</a>
+</div>
+{% endblock %}

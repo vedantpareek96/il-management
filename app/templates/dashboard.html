@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Introduction Leader{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Dashboard</h1>
+    <p>Welcome, {{ current_user.name }}!</p>
+    
+    <div class="dashboard-buttons">
+        {% if current_user.role.value == 'leader' %}
+            <a href="{{ url_for('main.register_statistic') }}" class="dashboard-button">
+                <h2>Register Statistic</h2>
+                <p>Submit a new session with statistics</p>
+            </a>
+            <a href="{{ url_for('main.my_stats') }}" class="dashboard-button">
+                <h2>View My Stats</h2>
+                <p>See your performance metrics</p>
+            </a>
+        {% elif current_user.role.value == 'staff' %}
+            <a href="{{ url_for('main.register_statistic') }}" class="dashboard-button">
+                <h2>Register Statistic</h2>
+                <p>Submit a new session with statistics</p>
+            </a>
+            <a href="{{ url_for('main.staff_stats') }}" class="dashboard-button">
+                <h2>Cumulative Statistics</h2>
+                <p>View aggregated statistics for all leaders</p>
+            </a>
+        {% elif current_user.is_admin %}
+            <a href="/admin" class="dashboard-button">
+                <h2>Flask-Admin</h2>
+                <p>Access admin back-office</p>
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

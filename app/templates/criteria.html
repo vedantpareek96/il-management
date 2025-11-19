@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Criteria Management - Introduction Leader{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Criteria Management</h1>
+    
+    {% if criteria_data %}
+        <table>
+            <thead>
+                <tr>
+                    {% for key in all_keys %}
+                        <th>{{ key.replace('_', ' ').title() }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in criteria_data %}
+                    <tr>
+                        {% for key in all_keys %}
+                            <td>
+                                {% if item[key] is not none %}
+                                    {% if key == 'effectiveness_target_pct' %}
+                                        {{ "%.2f"|format(item[key]) }}%
+                                    {% else %}
+                                        {{ item[key] }}
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No criteria found.</p>
+    {% endif %}
+    
+    <h2>Add New Criteria</h2>
+    <form method="POST" action="{{ url_for('admin.criteria_management') }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.person_id.label }}
+            {{ form.person_id(class="form-control") }}
+            <small>Leave empty for global criteria</small>
+            {% if form.person_id.errors %}
+                {% for error in form.person_id.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.guests_target.label }}
+            {{ form.guests_target(class="form-control") }}
+            {% if form.guests_target.errors %}
+                {% for error in form.guests_target.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.registrations_target.label }}
+            {{ form.registrations_target(class="form-control") }}
+            {% if form.registrations_target.errors %}
+                {% for error in form.registrations_target.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.effectiveness_target_pct.label }}
+            {{ form.effectiveness_target_pct(class="form-control") }}
+            {% if form.effectiveness_target_pct.errors %}
+                {% for error in form.effectiveness_target_pct.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-success">Add Criteria</button>
+    </form>
+    
+    <a href="{{ url_for('main.dashboard') }}" class="btn">Back to Dashboard</a>
+</div>
+{% endblock %}
+

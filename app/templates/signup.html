@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up - Introduction Leader{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Sign Up</h1>
+    
+    <form method="POST" action="{{ url_for('auth.signup_ui') }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.username.label }}
+            {{ form.username(class="form-control") }}
+            {% if form.username.errors %}
+                {% for error in form.username.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.password.label }}
+            {{ form.password(class="form-control") }}
+            {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.name.label }}
+            {{ form.name(class="form-control") }}
+            {% if form.name.errors %}
+                {% for error in form.name.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.region.label }}
+            {{ form.region(class="form-control") }}
+            {% if form.region.errors %}
+                {% for error in form.region.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.role.label }}
+            {{ form.role(class="form-control") }}
+            {% if form.role.errors %}
+                {% for error in form.role.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn">Sign Up</button>
+        <a href="{{ url_for('auth.login_ui') }}" class="btn btn-secondary">Already have an account? Login</a>
+    </form>
+</div>
+{% endblock %}

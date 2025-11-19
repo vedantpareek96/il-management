@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Introduction Leader{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('main.leaderboard') }}">Leaderboard</a>
+            {% if current_user.role.value == 'staff' or current_user.role.value == 'admin' %}
+                <a href="{{ url_for('main.staff_stats') }}">Staff Stats</a>
+            {% endif %}
+            {% if current_user.role.value == 'leader' %}
+                <a href="{{ url_for('main.my_stats') }}">My Stats</a>
+            {% endif %}
+            {% if current_user.is_admin %}
+                <a href="{{ url_for('admin.criteria_management') }}">Criteria</a>
+            {% endif %}
+            <span class="user-info">
+                <a href="{{ url_for('main.dashboard') }}">{{ current_user.name }}</a>
+                <a href="{{ url_for('auth.logout_ui') }}">Logout</a>
+            </span>
+        {% else %}
+            <a href="{{ url_for('auth.login_ui') }}">Login</a>
+            <a href="{{ url_for('auth.signup_ui') }}">Sign Up</a>
+        {% endif %}
+    </nav>
+    
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+    
+    <footer>
+        <p>&copy; 2024 Introduction Leader Application</p>
+    </footer>
+</body>
+</html>
