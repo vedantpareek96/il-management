@@ -114,6 +114,12 @@ class SessionMetrics(db.Model):
     def __repr__(self):
         return f'<SessionMetrics {self.session_id}>'
 
+    @staticmethod
+    def validate_room_captain(person_id):
+        person = Person.query.get(person_id)
+        if not person or person.role != RoleEnum.LEADER:
+            raise ValueError("Room Captain must be a leader.")
+
 
 class Criteria(db.Model):
     __tablename__ = 'criteria'
@@ -144,3 +150,19 @@ class AuditLog(db.Model):
     
     def __repr__(self):
         return f'<AuditLog {self.action} {self.created_at}>'
+
+class TemporarySession(db.Model):
+    __tablename__ = 'temporary_session'
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_data = Column(JSONB, nullable=False)
+    submitted_by = Column(UUID(as_uuid=True), ForeignKey('person.id'), nullable=False)
+    status = Column(String, default='pending')  # status can be 'pending', 'approved', 'rejected'
+    submitted_at = Column(db.DateTime, default=datetime.utcnow)
+
+class TemporarySessionMetrics(db.Model):
+    __tablename__ = 'temporary_session_metrics'
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey('session.id'))
+    guests_count = Column(Integer, nullable=False)
+    registrations_count = Column(Integer, nullable=False)
+    status = Column(String, default='pending')  # similar status handling

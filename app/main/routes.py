@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from app import db
-from app.models import Person, Session, Participation, SessionMetrics, ParticipationRoleEnum, RoleEnum
+from app.models import Person, Session, Participation, SessionMetrics, ParticipationRoleEnum, RoleEnum, TemporarySession
 from app.forms import RegisterStatisticForm, StaffStatsFilterForm, LeaderboardFilterForm
 from app.services import compute_person_totals, get_recent_sessions_for_person, compute_effectiveness
 from app.staff.routes import leaderboard as api_leaderboard
@@ -131,7 +131,15 @@ def my_stats():
             sessions_list.append({
                 'id': str(sess.id),
                 'date': sess.date.isoformat(),
-                'location': sess.location
+                'location': sess.location,
+                'stats': {
+                    'guests_count': sess.metrics.guests_count if sess.metrics else None,
+                    'registrations_count': sess.metrics.registrations_count if sess.metrics else None,
+                    'effectiveness_pct': (
+                        (sess.metrics.registrations_count / sess.metrics.guests_count * 100)
+                        if sess.metrics and sess.metrics.guests_count > 0 else None
+                    )
+                } if sess.metrics else {}
             })
         
         stats = {
@@ -198,7 +206,8 @@ def staff_stats():
         custom_args._params['date_from'] = filter_form.date_from.data.isoformat()
     if filter_form.date_to.data:
         custom_args._params['date_to'] = filter_form.date_to.data.isoformat()
-    
+    submitted_statistics = TemporarySession.query.filter_by(status='pending').all()
+
     # Temporarily replace request.args
     original_args_obj = request.args
     request.args = custom_args
@@ -228,7 +237,7 @@ def staff_stats():
         # Restore original args
         request.args = original_args_obj
     
-    return render_template('staff_stats.html', filter_form=filter_form, leaderboard_data=leaderboard_data)
+    return render_template('staff_stats.html', filter_form=filter_form, leaderboard_data=leaderboard_data, submitted_statistics = submitted_statistics)
 
 
 @bp.route('/leaderboard', methods=['GET'])

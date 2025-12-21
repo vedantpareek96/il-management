@@ -156,6 +156,24 @@ def upgrade() -> None:
     )
     op.create_index('ix_audit_log_created_at', 'audit_log', ['created_at'])
 
+    op.create_table(
+        'temporary_session',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=sa.text('gen_random_uuid()')),
+        sa.Column('session_data', postgresql.JSONB, nullable=False),
+        sa.Column('submitted_by', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('status', sa.String(), server_default='pending'),
+        sa.Column('submitted_at', sa.DateTime(), server_default=sa.func.now())
+    )
+
+    # Create TemporarySessionMetrics table
+    op.create_table(
+        'temporary_session_metrics',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=sa.text('gen_random_uuid()')),
+        sa.Column('session_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('session.id'), nullable=False),
+        sa.Column('guests_count', sa.Integer(), nullable=False),
+        sa.Column('registrations_count', sa.Integer(), nullable=False),
+        sa.Column('status', sa.String(), server_default='pending')
+    )
 
 def downgrade() -> None:
     op.drop_index('ix_audit_log_created_at', table_name='audit_log')
@@ -172,6 +190,9 @@ def downgrade() -> None:
     op.drop_index('ix_person_region', table_name='person')
     op.drop_index('ix_person_username', table_name='person')
     op.drop_table('person')
+    op.drop_table('temporary_session_metrics')
+    op.drop_table('temporary_session')
 
     op.execute('DROP TYPE IF EXISTS participationroleenum')
     op.execute('DROP TYPE IF EXISTS roleenum')
+

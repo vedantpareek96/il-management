@@ -3,6 +3,41 @@
 {% block title %}Staff Stats - Introduction Leader{% endblock %}
 
 {% block content %}
+<div>
+<h2>Submitted Statistics</h2>
+  <table>
+      <thead>
+          <tr>
+              <th>Statistic ID</th>
+              <th>Submitted By</th>
+              <th>Submitted At</th>
+              <th>Status</th>
+              <th>Actions</th>
+          </tr>
+      </thead>
+      <tbody>
+          {% for stat in submitted_statistics %}
+              <tr>
+                  <td>{{ stat.id }}</td>
+                  <td>{{ stat.submitted_by }}</td>
+                  <td>{{ stat.submitted_at.isoformat() }}</td>
+                  <td>{{ stat.status }}</td>
+                  <td>
+                      {% if stat.status == 'pending' %}
+                      <form action="{{ url_for('staff.approve', id=stat.id) }}" method="post" style="display:inline;">
+                          <button type="submit">Approve</button>
+                      </form>
+                      <form action="{{ url_for('staff.reject', id=stat.id) }}" method="post" style="display:inline;">
+                          <button type="submit">Reject</button>
+                      </form>
+                      {% endif %}
+                  </td>
+              </tr>
+          {% endfor %}
+      </tbody>
+  </table>
+</div>
+
 <div class="container">
     <h1>Cumulative Statistics</h1>
     

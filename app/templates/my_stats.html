@@ -31,13 +31,34 @@
             {% for session in stats.recent_sessions %}
                 <li class="session-item">
                     <strong>{{ session.date }}</strong> - {{ session.location }}
+                    <button class="toggle-details" onclick="toggleDetails('{{ session.id }}')">Show Details</button>
+                    <div id="details-{{ session.id }}" class="session-details" style="display: none;">
+                        {% if session.stats %}
+                            <p><strong>Guests Count:</strong> {{ session.stats.guests_count }}</p>
+                            <p><strong>Registrations Count:</strong> {{ session.stats.registrations_count }}</p>
+                            <p><strong>Effectiveness:</strong> {{ "%.2f"|format(session.stats.effectiveness_pct) }}%</p>
+                        {% else %}
+                            <p>No stats available for this session.</p>
+                        {% endif %}
+                    </div>
                 </li>
             {% endfor %}
         </ul>
     {% else %}
         <p>No sessions found.</p>
     {% endif %}
-    
+
     <a href="{{ url_for('main.dashboard') }}" class="btn">Back to Dashboard</a>
 </div>
+
+<script>
+function toggleDetails(sessionId) {
+    const details = document.getElementById(`details-${sessionId}`);
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+    } else {
+        details.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}

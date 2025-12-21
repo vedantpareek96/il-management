@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+  <h1>Statistics Inbox</h1>
+
+  <form method="GET" action="{{ url_for('staff.inbox') }}">
+      <div>
+          <label for="filter-region">Filter by Region:</label>
+          <input type="text" id="filter-region" name="region">
+      </div>
+      <div>
+          <label for="filter-name">Search by Leader Name:</label>
+          <input type="text" id="filter-name" name="name">
+      </div>
+      <div>
+          <button type="submit">Apply Filters</button>
+      </div>
+  </form>
+
+  <table>
+      <thead>
+          <tr>
+              <th>Submitted By</th>
+              <th>Submitted At</th>
+              <th>Actions</th>
+          </tr>
+      </thead>
+      <tbody>
+          {% for stat in inbox %}
+              <tr>
+                  <td>{{ stat.submitted_by }}</td>
+                  <td>{{ stat.submitted_at.isoformat() }}</td>
+                  <td>
+                      <form action="{{ url_for('staff.approve', id=stat.id) }}" method="post" style="display:inline;">
+                          <button type="submit">Approve</button>
+                      </form>
+                      <form action="{{ url_for('staff.reject', id=stat.id) }}" method="post" style="display:inline;">
+                          <button type="submit">Reject</button>
+                      </form>
+                  </td>
+              </tr>
+          {% endfor %}
+      </tbody>
+  </table>
+
+{% endblock %}

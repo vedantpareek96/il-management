@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from app import db
-from app.models import Person, Session, Participation, SessionMetrics, ParticipationRoleEnum, AuditLog
+from app.models import Person, Session, Participation, SessionMetrics, ParticipationRoleEnum, AuditLog, RoleEnum, \
+    TemporarySession, TemporarySessionMetrics
 from flask_login import login_required, current_user
 from datetime import datetime
 import uuid
@@ -32,13 +33,15 @@ def create_session():
     if data['registrations_count'] < 0 or data['guests_count'] < 0:
         logger.warning(f'Invalid session data: negative counts')
         return jsonify({'error': 'Counts must be non-negative'}), 400
-    
+    room_captain_id = data.get('room_captain_id')
+    if room_captain_id:
+        SessionMetrics.validate_room_captain(uuid.UUID(room_captain_id))
     try:
         # Start transaction
         session_id = uuid.uuid4()
         
         # Create session
-        session = Session(
+        session = TemporarySession(
             id=session_id,
             date=datetime.strptime(data['date'], '%Y-%m-%d').date(),
             location=data['location'],
@@ -47,23 +50,10 @@ def create_session():
             created_at=datetime.utcnow()
         )
         db.session.add(session)
-        
-        # Create participation rows
-        for participant in data['participants']:
-            if 'person_id' not in participant or 'role' not in participant:
-                db.session.rollback()
-                return jsonify({'error': 'Invalid participant data'}), 400
-            
-            participation = Participation(
-                id=uuid.uuid4(),
-                session_id=session_id,
-                person_id=uuid.UUID(participant['person_id']),
-                role=ParticipationRoleEnum[participant['role'].upper()]
-            )
-            db.session.add(participation)
+
         
         # Create session metrics
-        metrics = SessionMetrics(
+        metrics = TemporarySessionMetrics(
             session_id=session_id,
             guests_count=data['guests_count'],
             registrations_count=data['registrations_count'],
@@ -148,6 +138,18 @@ def get_session(session_id):
     except ValueError:
         return jsonify({'error': 'Invalid session ID format'}), 400
 
+@bp.route('/people/leaders', methods=['GET'])
+@login_required
+def get_leaders():
+    leaders = Person.query \
+        .filter(Person.role == RoleEnum.LEADER) \
+        .order_by(Person.name) \
+        .all()
+
+    return jsonify([
+        {"id": str(p.id), "name": p.name}
+        for p in leaders
+    ])
 
 @bp.route('/people/<person_id>/stats', methods=['GET'])
 @login_required
@@ -173,11 +175,22 @@ def get_person_stats(person_id):
         # Get recent sessions
         recent_sessions = get_recent_sessions_for_person(person_uuid, date_from, date_to, limit=10)
         sessions_list = []
+        logger.info("Recent sessions fetched for person stats.")
         for sess in recent_sessions:
+            logger.info(f"Processing session ID: {sess.id}")
+            logger.info("Session data: " + json.dumps(sess.__dict__, default=str))
             sessions_list.append({
                 'id': str(sess.id),
                 'date': sess.date.isoformat(),
-                'location': sess.location
+                'location': sess.location,
+                'stats': {
+                    'guests_count': sess.metrics.guests_count if sess.metrics else None,
+                    'registrations_count': sess.metrics.registrations_count if sess.metrics else None,
+                    'effectiveness_pct': (
+                        (sess.metrics.registrations_count / sess.metrics.guests_count * 100)
+                        if sess.metrics and sess.metrics.guests_count > 0 else None
+                    )
+                } if sess.metrics else {}
             })
         
         logger.info(f'Person stats retrieved: {person.name} (ID: {person_id})')

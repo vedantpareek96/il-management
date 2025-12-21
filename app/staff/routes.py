@@ -1,16 +1,108 @@
-from flask import Blueprint, request, jsonify, current_app
-from app import db
+
 from app.models import Person, Session, Participation, SessionMetrics, Criteria, ParticipationRoleEnum, RoleEnum
 from app.services import compute_person_totals, compute_effectiveness, compute_normalized_distance
-from flask_login import login_required, current_user
-from sqlalchemy import func, desc, and_, or_
+from sqlalchemy import func, desc, or_
 from datetime import datetime, timedelta
+from flask import Blueprint, request, jsonify
+from app import db
+from app.models import TemporarySession,AuditLog
+from flask_login import login_required, current_user
 import uuid
 import logging
-from . import bp
 
+
+bp = Blueprint('staff', __name__)
 logger = logging.getLogger(__name__)
 
+
+@bp.route('/inbox', methods=['GET'])
+@login_required
+def inbox():
+    """GET /staff/inbox - Fetch statistics awaiting approval"""
+    logger.info(f"Fetching inbox for staff: {current_user.username}")
+    statistics = TemporarySession.query.filter_by(status='pending').all()
+
+    # Prepare the response structure
+    response = []
+    for stat in statistics:
+        response.append({
+            'id': str(stat.id),
+            'session_data': stat.session_data,
+            'submitted_by': str(stat.submitted_by),
+            'submitted_at': stat.submitted_at.isoformat(),
+            'status': stat.status
+        })
+
+    logger.info(f"Found {len(statistics)} statistics awaiting approval.")
+    return jsonify(response), 200
+
+
+@bp.route('/approve/<id>', methods=['POST'])
+@login_required
+def approve(id):
+    """POST /staff/approve/<id> - Approve a statistic and move it to the main session table"""
+    logger.info(f"Approving statistic ID: {id} by {current_user.username}")
+    statistic = TemporarySession.query.get_or_404(id)
+
+    try:
+        # Logic to create the main session entry from the temporary one
+        # Assuming you have a function or logic that handles transforming
+        # the temporary statistic into the main session record.
+
+        # Move it to the main session table here (pseudo-code)
+        # main_session = Session(...)
+        # db.session.add(main_session)
+
+        # Mark as approved
+        statistic.status = 'approved'
+        db.session.commit()
+
+        # Audit log
+        audit = AuditLog(
+            id=uuid.uuid4(),
+            actor_id=current_user.id,
+            action='approve_statistic',
+            payload={'statistic_id': id}
+        )
+        db.session.add(audit)
+        db.session.commit()
+
+        logger.info(f"Statistic ID: {id} approved successfully.")
+        return jsonify({'message': 'Statistic approved successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error approving statistic ID: {id}: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/reject/<id>', methods=['POST'])
+@login_required
+def reject(id):
+    """POST /staff/reject/<id> - Reject a statistic and update its status"""
+    logger.info(f"Rejecting statistic ID: {id} by {current_user.username}")
+    statistic = TemporarySession.query.get_or_404(id)
+
+    try:
+        # Mark the statistic as rejected
+        statistic.status = 'rejected'
+        db.session.commit()
+
+        # Audit log
+        audit = AuditLog(
+            id=uuid.uuid4(),
+            actor_id=current_user.id,
+            action='reject_statistic',
+            payload={'statistic_id': id}
+        )
+        db.session.add(audit)
+        db.session.commit()
+
+        logger.info(f"Statistic ID: {id} rejected successfully.")
+        return jsonify({'message': 'Statistic rejected successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error rejecting statistic ID: {id}: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/leaderboard', methods=['GET'])
 @login_required

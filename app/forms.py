@@ -4,14 +4,20 @@ from wtforms.validators import DataRequired, Length, NumberRange, Optional, Vali
 from wtforms.widgets import TextArea
 from datetime import date
 
+from app.models import Person, RoleEnum
+
 
 class SignupForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
     name = StringField('Name', validators=[DataRequired(), Length(max=200)])
     region = StringField('Region', validators=[DataRequired(), Length(max=100)])
-    role = SelectField('Role', choices=[('leader', 'Leader'), ('staff', 'Staff')], 
-                      default='leader', validators=[DataRequired()])
+    role = SelectField(
+        'Role',
+        choices=[(r.value, r.name.title()) for r in RoleEnum if r != RoleEnum.ADMIN],
+        default=RoleEnum.LEADER.value,
+        validators=[DataRequired()]
+    )
 
 
 class LoginForm(FlaskForm):
@@ -33,6 +39,15 @@ class RegisterStatisticForm(FlaskForm):
             if field.data > self.guests_count.data:
                 raise ValidationError('Registrations count cannot exceed guests count')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.room_captain_id.choices = [("", "— None —")] + [
+            (str(person.id), person.name)
+            for person in Person.query
+            .filter(Person.role == RoleEnum.LEADER)
+            .order_by(Person.name)
+            .all()
+        ]
 
 class StaffStatsFilterForm(FlaskForm):
     region = SelectField('Region', coerce=str, validators=[Optional()])

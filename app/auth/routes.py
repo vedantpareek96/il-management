@@ -67,19 +67,21 @@ def login():
     """POST /login - Authenticate user and create session"""
     form = LoginForm()
     logger.info(f'API login attempt for username: {form.username.data if form.username.data else "unknown"}')
-    
+
     if not form.validate():
         logger.warning(f'Login validation failed: {form.errors}')
-        return jsonify({'error': 'Validation failed', 'errors': form.errors}), 400
-    
+        flash('Validation failed. Please check your input.', 'error')
+        return render_template('login.html', form=form)
+
     person = Person.query.filter_by(username=form.username.data).first()
-    
+
     if not person or not check_password_hash(person.password_hash, form.password.data):
         logger.warning(f'Failed login attempt for username: {form.username.data}')
-        return jsonify({'error': 'Invalid username or password'}), 401
-    
+        flash('Invalid username or password', 'error')
+        return render_template('login.html', form=form)
+
     login_user(person, remember=True)
-    
+
     # Audit log
     audit = AuditLog(
         id=uuid.uuid4(),
@@ -89,18 +91,10 @@ def login():
     )
     db.session.add(audit)
     db.session.commit()
-    
+
     logger.info(f'User logged in successfully: {person.username} (ID: {person.id})')
-    return jsonify({
-        'message': 'Login successful',
-        'user': {
-            'id': str(person.id),
-            'username': person.username,
-            'name': person.name,
-            'role': person.role.value,
-            'region': person.region
-        }
-    }), 200
+    flash(f'Welcome back, {person.name}!', 'success')
+    return redirect(url_for('main.dashboard'))
 
 
 @bp.route('/me', methods=['GET'])
@@ -207,13 +201,13 @@ def login_ui_post():
     """POST /login - Handle login form submission"""
     logger.info(f'Login form submission for username: {form.username.data if hasattr(form, "username") else "unknown"}')
     form = LoginForm()
-    
+
     if form.validate_on_submit():
         person = Person.query.filter_by(username=form.username.data).first()
-        
+
         if person and check_password_hash(person.password_hash, form.password.data):
             login_user(person, remember=True)
-            
+
             # Audit log
             audit = AuditLog(
                 id=uuid.uuid4(),
@@ -223,14 +217,14 @@ def login_ui_post():
             )
             db.session.add(audit)
             db.session.commit()
-            
+
             logger.info(f'User logged in via UI: {person.username} (ID: {person.id})')
             flash(f'Welcome back, {person.name}!', 'success')
             return redirect(url_for('main.dashboard'))
         else:
             logger.warning(f'Failed login attempt via UI for username: {form.username.data}')
             flash('Invalid username or password', 'error')
-    
+
     return render_template('login.html', form=form)
 
 
