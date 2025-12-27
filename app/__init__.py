@@ -88,11 +88,11 @@ def create_app():
     app.logger.info('Registered main blueprint')
     
     from app.leader import bp as leader_bp
-    app.register_blueprint(leader_bp, url_prefix='')
+    app.register_blueprint(leader_bp, url_prefix='/leader')
     app.logger.info('Registered leader blueprint')
     
     from app.staff import bp as staff_bp
-    app.register_blueprint(staff_bp, url_prefix='')
+    app.register_blueprint(staff_bp, url_prefix='/staff')
     app.logger.info('Registered staff blueprint')
     
     from app.admin import bp as admin_bp

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from app import db
-from app.models import Person, Session, Participation, SessionMetrics, ParticipationRoleEnum, RoleEnum, TemporarySession
+from app.models import Person, Session, Participation, SessionMetrics, ParticipationRoleEnum, RoleEnum, \
+    TemporarySession, TemporarySessionMetrics
 from app.forms import RegisterStatisticForm, StaffStatsFilterForm, LeaderboardFilterForm
 from app.services import compute_person_totals, get_recent_sessions_for_person, compute_effectiveness
 from app.staff.routes import leaderboard as api_leaderboard
@@ -24,76 +25,113 @@ def dashboard():
     logger.info(f'Dashboard accessed by: {current_user.username} (role: {current_user.role.value})')
     return render_template('dashboard.html')
 
-
 @bp.route('/register-statistic', methods=['GET', 'POST'])
 @login_required
 def register_statistic():
     """Register statistic form page"""
     logger.info(f'Register statistic page accessed by: {current_user.username}')
     form = RegisterStatisticForm()
-    
+
     # Populate participants and room captain dropdowns
     all_people = Person.query.filter(Person.role.in_([RoleEnum.LEADER, RoleEnum.STAFF])).all()
     form.participants.choices = [(str(p.id), f"{p.name} ({p.region})") for p in all_people]
     form.room_captain_id.choices = [('', 'None')] + [(str(p.id), f"{p.name} ({p.region})") for p in all_people]
-    
+
     # Pre-select current user as participant
     if request.method == 'GET':
         form.participants.data = [str(current_user.id)]
-    
+
     if form.validate_on_submit():
         # Validate registrations <= guests
         if form.registrations_count.data > form.guests_count.data:
             flash('Registrations count cannot exceed guests count', 'error')
             return render_template('register_statistic.html', form=form)
-        
+
         try:
-            # Create session
-            session_id = uuid.uuid4()
-            session = Session(
-                id=session_id,
-                date=form.date.data,
-                location=form.location.data,
-                notes=form.notes.data or None,
-                created_by=current_user.id,
-                created_at=datetime.utcnow()
-            )
-            db.session.add(session)
-            
-            # Create participation rows
-            for person_id_str in form.participants.data:
-                person_id = uuid.UUID(person_id_str)
-                # Current user is always a leader
-                role = ParticipationRoleEnum.LEADER if person_id == current_user.id else ParticipationRoleEnum.REGISTRATION_EXPERT
+            if current_user.role == RoleEnum.LEADER:
+                # LEADER submissions go to TemporarySession for approval
+                session_id = uuid.uuid4()
+                temp_session = TemporarySession(
+                    id=session_id,
+                    session_data={
+                        'date': form.date.data.isoformat(),
+                        'location': form.location.data,
+                        'notes': form.notes.data or None,
+                        'participants': form.participants.data,
+                        'room_captain_id': form.room_captain_id.data,
+                        'guests_count': form.guests_count.data,
+                        'registrations_count': form.registrations_count.data
+                    },
+                    submitted_by=current_user.id,
+                    submitted_at=datetime.utcnow(),
+                    status='pending'
+                )
+                db.session.add(temp_session)
+                db.session.commit()
+
+                logger.info(f'Temporary Session created: {session_id}')
+                flash('Statistics submitted for approval.', 'success')
+                return redirect(url_for('main.dashboard'))
+
+            elif current_user.role == RoleEnum.STAFF:
+                # STAFF submissions are directly added to Session and SessionMetrics
+                session_id = uuid.uuid4()
+                leader_id = form.room_captain_id.data or str(current_user.id)  # Use selected leader or STAFF themselves
+
+                # Create session
+                session = Session(
+                    id=session_id,
+                    date=form.date.data,
+                    location=form.location.data,
+                    notes=form.notes.data or None,
+                    created_by=current_user.id,
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(session)
+
+                # Add leader as a participant
                 participation = Participation(
                     id=uuid.uuid4(),
                     session_id=session_id,
-                    person_id=person_id,
-                    role=role
+                    person_id=uuid.UUID(leader_id),
+                    role=ParticipationRoleEnum.LEADER
                 )
                 db.session.add(participation)
-            
-            # Create session metrics
-            room_captain_id = uuid.UUID(form.room_captain_id.data) if form.room_captain_id.data else None
-            metrics = SessionMetrics(
-                session_id=session_id,
-                guests_count=form.guests_count.data,
-                registrations_count=form.registrations_count.data,
-                room_captain_id=room_captain_id,
-                submitted_by=current_user.id,
-                submitted_at=datetime.utcnow()
-            )
-            db.session.add(metrics)
-            db.session.commit()
-            
-            logger.info(f'Session registered via UI: {session_id} by {current_user.username}')
-            flash('Session registered successfully!', 'success')
-            return redirect(url_for('main.dashboard'))
+
+                # Add other participants
+                for person_id_str in form.participants.data:
+                    person_id = uuid.UUID(person_id_str)
+                    if person_id != uuid.UUID(leader_id):  # Avoid duplicate leader entry
+                        participation = Participation(
+                            id=uuid.uuid4(),
+                            session_id=session_id,
+                            person_id=person_id,
+                            role=ParticipationRoleEnum.REGISTRATION_EXPERT
+                        )
+                        db.session.add(participation)
+
+                # Create session metrics
+                room_captain_id = uuid.UUID(form.room_captain_id.data) if form.room_captain_id.data else None
+                metrics = SessionMetrics(
+                    session_id=session_id,
+                    guests_count=form.guests_count.data,
+                    registrations_count=form.registrations_count.data,
+                    room_captain_id=room_captain_id,
+                    submitted_by=current_user.id,
+                    submitted_at=datetime.utcnow()
+                )
+                db.session.add(metrics)
+                db.session.commit()
+
+                logger.info(f'Session registered directly by STAFF: {session_id}')
+                flash('Session registered successfully!', 'success')
+                return redirect(url_for('main.dashboard'))
+
         except Exception as e:
             db.session.rollback()
-            logger.error(f'Error creating session via UI: {str(e)}', exc_info=True)
+            logger.error(f'Error creating session: {str(e)}', exc_info=True)
             flash(f'Error creating session: {str(e)}', 'error')
-    
+
     return render_template('register_statistic.html', form=form)
 
 
@@ -122,6 +160,7 @@ def my_stats():
             pass
     
     # Compute stats using services
+    logger.info("Date From: %s, Date To: %s", date_from, date_to)
     try:
         totals = compute_person_totals(current_user.id, date_from, date_to)
         recent_sessions = get_recent_sessions_for_person(current_user.id, date_from, date_to, limit=10)
@@ -236,8 +275,17 @@ def staff_stats():
     finally:
         # Restore original args
         request.args = original_args_obj
-    
-    return render_template('staff_stats.html', filter_form=filter_form, leaderboard_data=leaderboard_data, submitted_statistics = submitted_statistics)
+    stats = []
+    for stat in submitted_statistics:
+        stats.append({
+            'id': str(stat.id),
+            'session_data': stat.session_data,
+            'submitted_by': Person.query.filter_by(id = str(stat.submitted_by)).first().name,
+            'submitted_at': stat.submitted_at,
+            'status': stat.status
+        })
+    logger.info(submitted_statistics)
+    return render_template('staff_stats.html', filter_form=filter_form, leaderboard_data=leaderboard_data, submitted_statistics = stats)
 
 
 @bp.route('/leaderboard', methods=['GET'])
@@ -313,3 +361,110 @@ def leaderboard():
         request.args = original_args_obj
     
     return render_template('leaderboard.html', filter_form=filter_form, leaderboard_data=leaderboard_data)
+
+
+@bp.route('/inbox', methods=['GET'])
+@login_required
+def inbox():
+    """GET /staff/inbox - Fetch statistics awaiting approval"""
+    logger.info(f"Fetching inbox for staff: {current_user.username}")
+    statistics = TemporarySession.query.filter_by(status='pending').all()
+
+    # Prepare the response structure
+    response = []
+    return render_template('staff_stats.html', submitted_statistics=statistics)
+
+    #
+    # logger.info(f"Found {len(statistics)} statistics awaiting approval.")
+    # return jsonify(response), 200
+
+
+@bp.route('/approve/<id>', methods=['POST'])
+@login_required
+def approve(id):
+    """Approve a statistic and move it to the main session table"""
+    logger.info(f"Approving statistic ID: {id} by {current_user.username}")
+    statistic = TemporarySession.query.get_or_404(id)
+
+    try:
+        # Extract session data
+        session_data = statistic.session_data
+        session_id = uuid.uuid4()
+
+        # Create session
+        session = Session(
+            id=session_id,
+            date=datetime.fromisoformat(session_data['date']),
+            location=session_data['location'],
+            notes=session_data.get('notes'),
+            created_by=statistic.submitted_by,
+            created_at=statistic.submitted_at
+        )
+        db.session.add(session)
+
+        # Add leader as a participant
+        participation = Participation(
+            id=uuid.uuid4(),
+            session_id=session_id,
+            person_id=statistic.submitted_by,
+            role=ParticipationRoleEnum.LEADER
+        )
+        db.session.add(participation)
+
+        # Add participants
+        # Add other participants
+        for person_id_str in session_data['participants']:
+            person_id = uuid.UUID(person_id_str)
+            if person_id_str != str(statistic.submitted_by):  # Avoid duplicate leader entry
+                participation = Participation(
+                    id=uuid.uuid4(),
+                    session_id=session_id,
+                    person_id=person_id,
+                    role=ParticipationRoleEnum.REGISTRATION_EXPERT
+                )
+                db.session.add(participation)
+
+        # Add session metrics
+        metrics = SessionMetrics(
+            session_id=session_id,
+            guests_count=session_data['guests_count'],
+            registrations_count=session_data['registrations_count'],
+            room_captain_id=uuid.UUID(session_data['room_captain_id']) if session_data['room_captain_id'] else None,
+            submitted_by=statistic.submitted_by,
+            submitted_at=statistic.submitted_at
+        )
+        db.session.add(metrics)
+
+        # Mark temporary session as approved
+        statistic.status = 'approved'
+        db.session.commit()
+
+        logger.info(f"Statistic ID: {id} approved successfully.")
+        flash('Statistic approved successfully.', 'success')
+        return redirect(url_for('main.staff_stats'))
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error approving statistic ID: {id}: {str(e)}", exc_info=True)
+        flash(f"Error approving statistic: {str(e)}", 'error')
+        return redirect(url_for('main.staff_stats'))
+
+
+@bp.route('/reject/<id>', methods=['POST'])
+@login_required
+def reject(id):
+    """Reject a statistic and update its status"""
+    logger.info(f"Rejecting statistic ID: {id} by {current_user.username}")
+    statistic = TemporarySession.query.get_or_404(id)
+
+    try:
+        statistic.status = 'rejected'
+        db.session.commit()
+
+        logger.info(f"Statistic ID: {id} rejected successfully.")
+        flash('Statistic rejected successfully.', 'success')
+        return redirect(url_for('main.staff_stats'))
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error rejecting statistic ID: {id}: {str(e)}", exc_info=True)
+        flash(f"Error rejecting statistic: {str(e)}", 'error')
+        return redirect(url_for('main.staff_stats'))

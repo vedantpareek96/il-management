@@ -3,67 +3,70 @@
 {% block title %}Staff Stats - Introduction Leader{% endblock %}
 
 {% block content %}
-<div>
-<h2>Submitted Statistics</h2>
-  <table>
-      <thead>
-          <tr>
-              <th>Statistic ID</th>
-              <th>Submitted By</th>
-              <th>Submitted At</th>
-              <th>Status</th>
-              <th>Actions</th>
-          </tr>
-      </thead>
-      <tbody>
-          {% for stat in submitted_statistics %}
-              <tr>
-                  <td>{{ stat.id }}</td>
-                  <td>{{ stat.submitted_by }}</td>
-                  <td>{{ stat.submitted_at.isoformat() }}</td>
-                  <td>{{ stat.status }}</td>
-                  <td>
-                      {% if stat.status == 'pending' %}
-                      <form action="{{ url_for('staff.approve', id=stat.id) }}" method="post" style="display:inline;">
-                          <button type="submit">Approve</button>
-                      </form>
-                      <form action="{{ url_for('staff.reject', id=stat.id) }}" method="post" style="display:inline;">
-                          <button type="submit">Reject</button>
-                      </form>
-                      {% endif %}
-                  </td>
-              </tr>
-          {% endfor %}
-      </tbody>
-  </table>
-</div>
-
-<div class="container">
-    <h1>Cumulative Statistics</h1>
-    
-    <form method="GET" action="{{ url_for('main.staff_stats') }}" class="filter-form">
-        <div class="form-group">
-            {{ filter_form.region.label }}
-            {{ filter_form.region(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.date_from.label }}
-            {{ filter_form.date_from(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.date_to.label }}
-            {{ filter_form.date_to(class="form-control") }}
-        </div>
-        <div class="form-group">
-            <label>&nbsp;</label>
-            <button type="submit" class="btn">Apply Filters</button>
-            <a href="{{ url_for('main.staff_stats') }}" class="btn btn-secondary">Clear</a>
-        </div>
-    </form>
-    
-    {% if leaderboard_data %}
+    <div>
+        <h2>Submitted Statistics</h2>
         <table>
             <thead>
+            <tr>
+                <th>Stats Data</th>
+                <th>Submitted By</th>
+                <th>Submitted At</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for stat in submitted_statistics %}
+                <tr>
+                    <td>Guests :{{ stat.session_data.guests_count }}
+                        Registrations :{{ stat.session_data.registrations_count }}</td>
+                    <td>{{ stat.submitted_by }}</td>
+                    <td>{{ stat.submitted_at }}</td>
+                    <td>{{ stat.status }}</td>
+                    <td>
+                        {% if stat.status == 'pending' %}
+                            <form action="{{ url_for('main.approve', id=stat.id) }}" method="post"
+                                  style="display:inline;">
+                                <button type="submit">Approve</button>
+                            </form>
+                            <form action="{{ url_for('main.reject', id=stat.id) }}" method="post"
+                                  style="display:inline;">
+                                <button type="submit">Reject</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="container">
+        <h1>Cumulative Statistics</h1>
+
+        <form method="GET" action="{{ url_for('main.staff_stats') }}" class="filter-form">
+            <div class="form-group">
+                {{ filter_form.region.label }}
+                {{ filter_form.region(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.date_from.label }}
+                {{ filter_form.date_from(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.date_to.label }}
+                {{ filter_form.date_to(class="form-control") }}
+            </div>
+            <div class="form-group">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn">Apply Filters</button>
+                <a href="{{ url_for('main.staff_stats') }}" class="btn btn-secondary">Clear</a>
+            </div>
+        </form>
+
+        {% if leaderboard_data %}
+            <table>
+                <thead>
                 <tr>
                     <th>Name</th>
                     <th>Region</th>
@@ -71,8 +74,8 @@
                     <th>Total Registrations</th>
                     <th>Effectiveness %</th>
                 </tr>
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                 {% for person in leaderboard_data %}
                     <tr>
                         <td>{{ person.name }}</td>
@@ -82,12 +85,12 @@
                         <td>{{ "%.2f"|format(person.effectiveness_pct) }}%</td>
                     </tr>
                 {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No data available for the selected filters.</p>
-    {% endif %}
-    
-    <a href="{{ url_for('main.dashboard') }}" class="btn">Back to Dashboard</a>
-</div>
+                </tbody>
+            </table>
+        {% else %}
+            <p>No data available for the selected filters.</p>
+        {% endif %}
+
+        <a href="{{ url_for('main.dashboard') }}" class="btn">Back to Dashboard</a>
+    </div>
 {% endblock %}

@@ -4,7 +4,7 @@
 
   <h1>Statistics Inbox</h1>
 
-  <form method="GET" action="{{ url_for('staff.inbox') }}">
+  <form method="GET" action="{{ url_for('main.inbox') }}">
       <div>
           <label for="filter-region">Filter by Region:</label>
           <input type="text" id="filter-region" name="region">
@@ -32,10 +32,10 @@
                   <td>{{ stat.submitted_by }}</td>
                   <td>{{ stat.submitted_at.isoformat() }}</td>
                   <td>
-                      <form action="{{ url_for('staff.approve', id=stat.id) }}" method="post" style="display:inline;">
+                      <form action="{{ url_for('main.approve', id=stat.id) }}" method="post" style="display:inline;">
                           <button type="submit">Approve</button>
                       </form>
-                      <form action="{{ url_for('staff.reject', id=stat.id) }}" method="post" style="display:inline;">
+                      <form action="{{ url_for('main.reject', id=stat.id) }}" method="post" style="display:inline;">
                           <button type="submit">Reject</button>
                       </form>
                   </td>

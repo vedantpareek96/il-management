@@ -1,108 +1,16 @@
-
 from app.models import Person, Session, Participation, SessionMetrics, Criteria, ParticipationRoleEnum, RoleEnum
 from app.services import compute_person_totals, compute_effectiveness, compute_normalized_distance
 from sqlalchemy import func, desc, or_
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, flash, redirect, url_for, render_template
 from app import db
-from app.models import TemporarySession,AuditLog
+from app.models import TemporarySession, AuditLog
 from flask_login import login_required, current_user
 import uuid
 import logging
 
-
 bp = Blueprint('staff', __name__)
 logger = logging.getLogger(__name__)
-
-
-@bp.route('/inbox', methods=['GET'])
-@login_required
-def inbox():
-    """GET /staff/inbox - Fetch statistics awaiting approval"""
-    logger.info(f"Fetching inbox for staff: {current_user.username}")
-    statistics = TemporarySession.query.filter_by(status='pending').all()
-
-    # Prepare the response structure
-    response = []
-    for stat in statistics:
-        response.append({
-            'id': str(stat.id),
-            'session_data': stat.session_data,
-            'submitted_by': str(stat.submitted_by),
-            'submitted_at': stat.submitted_at.isoformat(),
-            'status': stat.status
-        })
-
-    logger.info(f"Found {len(statistics)} statistics awaiting approval.")
-    return jsonify(response), 200
-
-
-@bp.route('/approve/<id>', methods=['POST'])
-@login_required
-def approve(id):
-    """POST /staff/approve/<id> - Approve a statistic and move it to the main session table"""
-    logger.info(f"Approving statistic ID: {id} by {current_user.username}")
-    statistic = TemporarySession.query.get_or_404(id)
-
-    try:
-        # Logic to create the main session entry from the temporary one
-        # Assuming you have a function or logic that handles transforming
-        # the temporary statistic into the main session record.
-
-        # Move it to the main session table here (pseudo-code)
-        # main_session = Session(...)
-        # db.session.add(main_session)
-
-        # Mark as approved
-        statistic.status = 'approved'
-        db.session.commit()
-
-        # Audit log
-        audit = AuditLog(
-            id=uuid.uuid4(),
-            actor_id=current_user.id,
-            action='approve_statistic',
-            payload={'statistic_id': id}
-        )
-        db.session.add(audit)
-        db.session.commit()
-
-        logger.info(f"Statistic ID: {id} approved successfully.")
-        return jsonify({'message': 'Statistic approved successfully'}), 200
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error approving statistic ID: {id}: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/reject/<id>', methods=['POST'])
-@login_required
-def reject(id):
-    """POST /staff/reject/<id> - Reject a statistic and update its status"""
-    logger.info(f"Rejecting statistic ID: {id} by {current_user.username}")
-    statistic = TemporarySession.query.get_or_404(id)
-
-    try:
-        # Mark the statistic as rejected
-        statistic.status = 'rejected'
-        db.session.commit()
-
-        # Audit log
-        audit = AuditLog(
-            id=uuid.uuid4(),
-            actor_id=current_user.id,
-            action='reject_statistic',
-            payload={'statistic_id': id}
-        )
-        db.session.add(audit)
-        db.session.commit()
-
-        logger.info(f"Statistic ID: {id} rejected successfully.")
-        return jsonify({'message': 'Statistic rejected successfully'}), 200
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error rejecting statistic ID: {id}: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
 
 @bp.route('/leaderboard', methods=['GET'])
 @login_required
@@ -117,10 +25,10 @@ def leaderboard():
         date_from = datetime.strptime(request.args.get('date_from'), '%Y-%m-%d').date()
     if request.args.get('date_to'):
         date_to = datetime.strptime(request.args.get('date_to'), '%Y-%m-%d').date()
-    
+
     metric = request.args.get('metric', 'registrations')  # default: registrations
     limit = int(request.args.get('limit', 50))
-    
+
     # Build base query
     query = db.session.query(
         Person.id,
@@ -137,7 +45,7 @@ def leaderboard():
     ).filter(
         Participation.role == ParticipationRoleEnum.LEADER
     )
-    
+
     # Apply filters
     if region:
         query = query.filter(Person.region == region)
@@ -145,10 +53,10 @@ def leaderboard():
         query = query.filter(Session.date >= date_from)
     if date_to:
         query = query.filter(Session.date <= date_to)
-    
+
     # Group by person
     query = query.group_by(Person.id, Person.name, Person.region)
-    
+
     # Order by metric
     if metric == 'registrations':
         query = query.order_by(desc('total_registrations'))
@@ -174,7 +82,7 @@ def leaderboard():
         return jsonify({'leaderboard': leaderboard_data[:limit]}), 200
     else:
         return jsonify({'error': 'Invalid metric. Use: registrations, guests, or effectiveness'}), 400
-    
+
     # Execute query and format results
     results = query.limit(limit).all()
     leaderboard_data = []
@@ -188,7 +96,7 @@ def leaderboard():
             'total_registrations': row.total_registrations or 0,
             'effectiveness_pct': float(effectiveness)
         })
-    
+
     logger.info(f'Leaderboard returned {len(leaderboard_data)} entries')
     return jsonify({'leaderboard_data': leaderboard_data}), 200
 
@@ -200,17 +108,17 @@ def get_people():
     filter_type = request.args.get('filter')
     region = request.args.get('region')
     limit = int(request.args.get('limit', 50))
-    
+
     query = Person.query.filter(Person.role == RoleEnum.LEADER)
-    
+
     if region:
         query = query.filter(Person.region == region)
-    
+
     if filter_type == 'close_to_target':
         # Get all people with criteria
         people = query.all()
         people_with_distance = []
-        
+
         for person in people:
             # Get global criteria or person-specific criteria
             criteria = Criteria.query.filter(
@@ -218,22 +126,22 @@ def get_people():
             ).order_by(
                 Criteria.person_id.desc()  # Prefer person-specific over global
             ).first()
-            
+
             if criteria:
                 # Compute person totals (all time)
                 totals = compute_person_totals(person.id)
                 distance = compute_normalized_distance(totals, criteria)
-                
+
                 if distance is not None:
                     people_with_distance.append({
                         'person': person,
                         'distance': distance,
                         'totals': totals
                     })
-        
+
         # Sort by distance (closest to target first)
         people_with_distance.sort(key=lambda x: x['distance'])
-        
+
         result = []
         for item in people_with_distance[:limit]:
             result.append({
@@ -243,17 +151,17 @@ def get_people():
                 'distance_to_target': item['distance'],
                 'totals': item['totals']
             })
-        
+
         return jsonify({'people': result}), 200
-        
+
     elif filter_type == 'not_led_in_months':
         # Find people who haven't led a session in the last N months
         months = int(request.args.get('months', 3))
         cutoff_date = datetime.utcnow().date() - timedelta(days=months * 30)
-        
+
         # Get all leaders
         all_leaders = query.all()
-        
+
         # Find those without recent leadership participations
         inactive_leaders = []
         for leader in all_leaders:
@@ -264,16 +172,16 @@ def get_people():
                 Participation.role == ParticipationRoleEnum.LEADER,
                 Session.date >= cutoff_date
             ).first()
-            
+
             if not recent_session:
                 inactive_leaders.append({
                     'person_id': str(leader.id),
                     'name': leader.name,
                     'region': leader.region
                 })
-        
+
         return jsonify({'people': inactive_leaders[:limit]}), 200
-    
+
     else:
         # Return all leaders (no filter)
         people = query.limit(limit).all()
@@ -282,5 +190,5 @@ def get_people():
             'name': p.name,
             'region': p.region
         } for p in people]
-        
+
         return jsonify({'people': result}), 200

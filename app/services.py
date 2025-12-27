@@ -109,7 +109,7 @@ def get_recent_sessions_for_person(person_id, date_from=None, date_to=None, limi
     """
     Get recent sessions where person was a leader.
     """
-    logger.debug(f'Fetching recent sessions for person: {person_id}, limit: {limit}')
+    logger.info(f'Fetching recent sessions for person: {person_id}, limit: {limit}')
     query = db.session.query(Session).join(
         Participation, Session.id == Participation.session_id
     ).filter(
@@ -121,7 +121,7 @@ def get_recent_sessions_for_person(person_id, date_from=None, date_to=None, limi
         query = query.filter(Session.date >= date_from)
     if date_to:
         query = query.filter(Session.date <= date_to)
-    
+    logger.info(f'Executing query to fetch recent sessions for person: {query}')
     sessions = query.limit(limit).all()
-    logger.debug(f'Found {len(sessions)} recent sessions for person: {person_id}')
+    logger.info(f'Found {sessions} recent sessions for person: {person_id}')
     return sessions
